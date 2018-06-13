@@ -1,8 +1,14 @@
 package com.hm.wx.version.update;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.os.Build;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -25,6 +31,7 @@ import com.benmu.widget.utils.BaseCommonUtil;
 import com.hm.wx.version.listener.JsVersionListener;
 import com.hm.wx.version.manager.impl.VersionAxiosManager;
 import com.hm.wx.version.model.JsVersionBean;
+import com.hm.wx.version.model.JsVersionReqBean;
 import com.hm.wx.version.utils.CommonUtils;
 import com.hm.wx.version.utils.FileUtil;
 
@@ -55,48 +62,32 @@ public class JsVersionChecker {
     private int mCurrentStatus = SLEEP;
     private JsVersionListener listener;
 
-    JsVersionChecker(Activity context) {
+    private JsVersionReqBean jvrb;
+
+    JsVersionChecker(Activity context, JsVersionReqBean reqBean) {
         this.mContext = context;
+        this.jvrb = reqBean;
     }
 
-    public void check(Context context, String url, boolean isDiff, StringCallback callback) {
+    public void check(boolean isDiff, StringCallback callback) {
         HashMap<String, String> params = new HashMap();
-        params.put("appName", "home-app");
-        params.put("android", BaseCommonUtil.getVersionName(context));
-        String versionInfo = SharePreferenceUtil.getDownLoadVersion(context);
-        if(TextUtils.isEmpty(versionInfo)) {
-            versionInfo = SharePreferenceUtil.getVersion(context);
-        }
-
-        if(TextUtils.isEmpty(versionInfo)) {
-            versionInfo = "";
-        } else {
-            ParseManager parseManager = (ParseManager)ManagerFactory.getManagerService(ParseManager.class);
-            JsVersionInfoBean jsVersionInfoBean = (JsVersionInfoBean)parseManager.parseObject(versionInfo, JsVersionInfoBean.class);
-            if(jsVersionInfoBean == null) {
-                versionInfo = "";
-            } else {
-                versionInfo = jsVersionInfoBean.getJsVersion();
-            }
-        }
-
-        if(!TextUtils.isEmpty(versionInfo)) {
-            params.put("jsVersion", versionInfo);
-            params.put("isDiff", isDiff?"1":"0");
+        try {
+            params.put("appName", jvrb.getAppName());
+            params.put("android", jvrb.getAndroid());
+            params.put("jsVersion", jvrb.getJsVersion());
+            params.put("isDiff", isDiff ? "1" : "0");
             VersionAxiosManager axiosManager = (VersionAxiosManager)ManagerFactory.getManagerService(VersionAxiosManager.class);
-            axiosManager.get(url, params, (HashMap)null, callback, url, 0L);
+            axiosManager.get(jvrb.getBaseUrl(), params, (HashMap)null, callback, jvrb.getBaseUrl(), 0L);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
     public void checkJsUpdate() {
         if (mCurrentStatus == UPDATING) return;
-
-        mUpdateUrl = "https://appserver.anxintrust.net/nodejs/app/checkJsVersion?jsVersion=aa7964cc9f789364a107c62bf017cb4c&isDiff=1&appName=home-app&android=1.0.10";
-        if (TextUtils.isEmpty(mUpdateUrl)) return;
-
         mCurrentStatus = UPDATING;
-        check(mContext, mUpdateUrl,
-                true, new StringCallback() {
+
+        check(true, new StringCallback() {
                     @Override
                     public void onError(Call call, Exception e, int id) {
                         Log.e(TAG, "获取更新失败");
@@ -157,11 +148,10 @@ public class JsVersionChecker {
      * 下载全量包
      */
     private void downloadCompleteZip() {
-        check(mContext, mUpdateUrl,
-                false, new StringCallback() {
+        check(false, new StringCallback() {
                     @Override
                     public void onError(Call call, Exception e, int id) {
-                        L.e(TAG, "检查全量包失败!，更新失败");
+                        Log.e(TAG, "检查全量包失败!，更新失败");
                     }
 
                     @Override
@@ -170,7 +160,7 @@ public class JsVersionChecker {
                                 .class).parseObject(response, VersionBean
                                 .class);
                         if (version != null && !TextUtils.isEmpty(version.data.path)) {
-                            L.e(TAG, "检查全量包成功!，开始下载");
+                            Log.e(TAG, "检查全量包成功!，开始下载");
                             download(version, true);
                         }
                     }

@@ -10,7 +10,7 @@ public interface DownloadListener {
 
     void onProgress(int progress);
 
-    void onSuccess();
+    void onSuccess(String fileName);
 
     void onFailed();
 

@@ -1,34 +1,36 @@
 package com.hm.wx.version.update;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.ComponentName;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
 import android.os.IBinder;
+import android.support.v4.content.ContextCompat;
 import android.support.v4.content.FileProvider;
+import android.support.v7.app.AppCompatActivity;
 import android.text.TextUtils;
 import android.util.Log;
 import android.widget.Toast;
 
 import com.alibaba.fastjson.JSON;
-import com.benmu.framework.BMWXEnvironment;
 import com.benmu.framework.http.okhttp.callback.StringCallback;
 import com.benmu.framework.manager.ManagerFactory;
-import com.benmu.framework.manager.impl.AxiosManager;
 import com.benmu.framework.manager.impl.ParseManager;
 import com.benmu.widget.utils.BaseCommonUtil;
 import com.hm.wx.version.listener.DownloadListener;
 import com.hm.wx.version.manager.impl.VersionAxiosManager;
-import com.hm.wx.version.model.NativeVersionBean;
+import com.hm.wx.version.model.JsVersionReqBean;
+import com.hm.wx.version.model.NativeVersionReqBean;
+import com.hm.wx.version.model.NativeVersionResBean;
 import com.hm.wx.version.service.DownloadService;
 import com.hm.wx.version.utils.CommonUtils;
-
-import org.json.JSONObject;
 
 import java.io.File;
 import java.util.HashMap;
@@ -44,37 +46,69 @@ import static android.content.Context.BIND_AUTO_CREATE;
  */
 
 public class NativeVersionChecker {
+
     public static final int UPDATING = 0;
     public static final int SLEEP = 1;
 
     private Activity context;
     private static final String TAG = "NativeVersionChecker";
-    private NativeVersionBean version;
+    public static final String APK_NAME_DEFAULT = "wx-eros-android.apk";
+    private NativeVersionResBean version;
     private int mCurrentStatus = SLEEP;
 
     private ProgressDialog pd;
 
     private boolean isConnectionBind;
 
-    public NativeVersionChecker(Activity context) {
+    private NativeVersionReqBean nvrb;
+
+    private JsVersionReqBean jvrb;
+
+
+    public NativeVersionChecker(Activity context, NativeVersionReqBean nvrb) {
+        this.nvrb = nvrb;
         this.context = context;
     }
 
-    private void check(String url, String appName, StringCallback
-            callback) {
-        HashMap<String, String> params = new HashMap<>();
-        params.put("appName", appName);
-        params.put("clientVersion", BaseCommonUtil.getVersionName(context));
-        params.put("clientType", "android");
-        VersionAxiosManager axiosManager = ManagerFactory.getManagerService(VersionAxiosManager.class);
-        axiosManager.get(url, params, null, callback, url, 0);
+    public NativeVersionChecker(Activity context, NativeVersionReqBean nvrb, JsVersionReqBean jvrb) {
+        this.context = context;
+        this.nvrb = nvrb;
+        this.jvrb = jvrb;
     }
 
-    public void checkNativeUpdate(String baseUrl, String appName) {
+    private void check(StringCallback callback){
+        HashMap<String, String> params = new HashMap<>();
+        try {
+            params.put("appName", nvrb.getAppName());
+            params.put("clientVersion", nvrb.getClientVersion());
+            params.put("clientType", "android");
+            VersionAxiosManager axiosManager = ManagerFactory.getManagerService(VersionAxiosManager.class);
+            axiosManager.get(nvrb.getBaseUrl(), params, null, callback, nvrb.getBaseUrl(), 0);
+        } catch (Exception e) {
+            Log.e(TAG,  e.getMessage());
+        }
+    }
+
+    public void checkNativeUpdate() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                CommonUtils.CommonAlert.showAlert(context,
+                        "提示",
+                        "需要允许读写存储卡权限",
+                        "确定", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                dialog.cancel();
+                            }
+                        }, "", null, false);
+                return;
+            }
+        }
+
         if (mCurrentStatus == UPDATING) return;
         mCurrentStatus = UPDATING;
 
-        check(baseUrl, appName, new StringCallback() {
+        check(new StringCallback() {
             @Override
             public void onError(Call call, Exception e, int id) {
                 mCurrentStatus = SLEEP;
@@ -84,7 +118,7 @@ public class NativeVersionChecker {
             @Override
             public void onResponse(String response, int id) {
                 version = ManagerFactory.getManagerService(ParseManager
-                        .class).parseObject(response, NativeVersionBean.class);
+                        .class).parseObject(response, NativeVersionResBean.class);
                 if (version == null) {
                     mCurrentStatus = SLEEP;
                     Log.e(TAG, "version == null");
@@ -107,8 +141,10 @@ public class NativeVersionChecker {
                     case "APP0001":
                         //版本最新
                         mCurrentStatus = SLEEP;
-                        JsVersionChecker jsVersionChecker = new JsVersionChecker(context);
-                        jsVersionChecker.checkJsUpdate();
+                        if (jvrb != null) {
+                            JsVersionChecker jsVersionChecker = new JsVersionChecker(context, jvrb);
+                            jsVersionChecker.checkJsUpdate();
+                        }
                         break;
                     default:
                         break;
@@ -144,12 +180,12 @@ public class NativeVersionChecker {
         }
 
         @Override
-        public void onSuccess() {
+        public void onSuccess(String fileName) {
             pd.cancel();
             context.unbindService(connection);
             isConnectionBind = false;
             mCurrentStatus = SLEEP;
-            File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "axxthome.apk");
+            File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), fileName);
             Intent intent = new Intent(Intent.ACTION_VIEW);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             if (Build.VERSION.SDK_INT >= 24) {
@@ -158,7 +194,7 @@ public class NativeVersionChecker {
                 intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
             } else {
                 intent.setDataAndType(Uri.fromFile(
-                        new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "axxthome.apk")),
+                        new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), fileName)),
                         "application/vnd.android.package-archive");
             }
             context.startActivity(intent);
@@ -168,6 +204,8 @@ public class NativeVersionChecker {
         @Override
         public void onFailed() {
             pd.cancel();
+            context.unbindService(connection);
+            isConnectionBind = false;
             Toast.makeText(context, "安装包下载失败", Toast.LENGTH_SHORT).show();
             mCurrentStatus = SLEEP;
         }
@@ -195,6 +233,10 @@ public class NativeVersionChecker {
                         context.unbindService(connection);
                         isConnectionBind = false;
                         mCurrentStatus = SLEEP;
+                        if (jvrb != null) {
+                            JsVersionChecker jsVersionChecker = new JsVersionChecker(context, jvrb);
+                            jsVersionChecker.checkJsUpdate();
+                        }
                     }
                 }, false);
     }

@@ -8,7 +8,7 @@ import java.io.Serializable;
  * com.hm.wx.version.modal
  */
 
-public class NativeVersionBean implements Serializable {
+public class NativeVersionResBean implements Serializable {
 
     private String resCode;
     private String msg;
