@@ -64,12 +64,12 @@ public class JsVersionChecker {
 
     private JsVersionReqBean jvrb;
 
-    JsVersionChecker(Activity context, JsVersionReqBean reqBean) {
+    public JsVersionChecker(Activity context, JsVersionReqBean reqBean) {
         this.mContext = context;
         this.jvrb = reqBean;
     }
 
-    public void check(boolean isDiff, StringCallback callback) {
+    private void check(boolean isDiff, StringCallback callback) {
         HashMap<String, String> params = new HashMap();
         try {
             params.put("appName", jvrb.getAppName());
@@ -170,7 +170,7 @@ public class JsVersionChecker {
     /**
      * 下载包
      */
-    public void download(final VersionBean version, final boolean complete) {
+    private void download(final VersionBean version, final boolean complete) {
         try {
             if (version == null) {
                 mCurrentStatus = SLEEP;
@@ -347,22 +347,7 @@ public class JsVersionChecker {
                         .BUNDLE_NAME);
     }
 
-    public void startDownloadZip(VersionBean version) {
-        if (!TextUtils.isEmpty(version.data.path)) {
-            if (version.data.diff) {
-                //更新插分包
-                Log.e(TAG, "检查插分包");
-                download(version, false);
-            } else {
-                //下载全量包
-                Log.e(TAG, "检查全量包");
-                downloadCompleteZip();
-            }
-        } else {
-            //下载全量包
-            Log.e(TAG, "检查全量包");
-            downloadCompleteZip();
-        }
+    public void releaseAll() {
+        CommonUtils.CommonAlert.closeAlert();
     }
-
 }
