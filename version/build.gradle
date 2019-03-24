@@ -37,6 +37,5 @@ repositories {
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 
-//    implementation 'com.github.bmfe.eros-nexus:nexus:1.0.3'
-    implementation 'com.github.bmfe:WeexErosFramework:1.0.4'
+    api 'com.github.bmfe:WeexErosFramework:1.0.4'
 }
