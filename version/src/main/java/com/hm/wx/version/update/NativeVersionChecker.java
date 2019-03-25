@@ -14,28 +14,24 @@ import android.os.Environment;
 import android.os.IBinder;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.content.FileProvider;
-import android.support.v7.app.AppCompatActivity;
 import android.text.TextUtils;
-import android.util.Log;
 import android.widget.Toast;
 
-import com.alibaba.fastjson.JSON;
-import com.benmu.framework.http.okhttp.callback.StringCallback;
-import com.benmu.framework.manager.ManagerFactory;
-import com.benmu.framework.manager.impl.ParseManager;
-import com.benmu.widget.utils.BaseCommonUtil;
+import com.hm.wx.version.controller.GetVersionInterface;
 import com.hm.wx.version.listener.DownloadListener;
-import com.hm.wx.version.manager.impl.VersionAxiosManager;
-import com.hm.wx.version.model.JsVersionReqBean;
 import com.hm.wx.version.model.NativeVersionReqBean;
 import com.hm.wx.version.model.NativeVersionResBean;
 import com.hm.wx.version.service.DownloadService;
 import com.hm.wx.version.utils.CommonUtils;
 
 import java.io.File;
-import java.util.HashMap;
+import java.util.Map;
 
-import okhttp3.Call;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
 
 import static android.content.Context.BIND_AUTO_CREATE;
 
@@ -52,7 +48,7 @@ public class NativeVersionChecker {
 
     private Activity context;
     private static final String TAG = "NativeVersionChecker";
-    public static final String APK_NAME_DEFAULT = "wx-eros-android.apk";
+    public static final String APK_NAME_DEFAULT = "android.apk";
     private NativeVersionResBean version;
     private int mCurrentStatus = SLEEP;
 
@@ -62,97 +58,9 @@ public class NativeVersionChecker {
 
     private NativeVersionReqBean nvrb;
 
-    private JsVersionReqBean jvrb;
+    private Map<String, String> params;
 
-
-    public NativeVersionChecker(Activity context, NativeVersionReqBean nvrb) {
-        this.nvrb = nvrb;
-        this.context = context;
-    }
-
-    public NativeVersionChecker(Activity context, NativeVersionReqBean nvrb, JsVersionReqBean jvrb) {
-        this.context = context;
-        this.nvrb = nvrb;
-        this.jvrb = jvrb;
-    }
-
-    private void check(StringCallback callback){
-        HashMap<String, String> params = new HashMap<>();
-        try {
-            params.put("appName", nvrb.getAppName());
-            params.put("clientVersion", nvrb.getClientVersion());
-            params.put("clientType", "android");
-            VersionAxiosManager axiosManager = ManagerFactory.getManagerService(VersionAxiosManager.class);
-            axiosManager.get(nvrb.getBaseUrl(), params, null, callback, nvrb.getBaseUrl(), 0);
-        } catch (Exception e) {
-            Log.e(TAG,  e.getMessage());
-        }
-    }
-
-    public void checkNativeUpdate() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                CommonUtils.CommonAlert.showAlert(context,
-                        "提示",
-                        "需要允许读写存储卡权限",
-                        "确定", new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int which) {
-                                dialog.cancel();
-                            }
-                        }, "", null, false);
-                return;
-            }
-        }
-
-        if (mCurrentStatus == UPDATING) return;
-        mCurrentStatus = UPDATING;
-
-        check(new StringCallback() {
-            @Override
-            public void onError(Call call, Exception e, int id) {
-                mCurrentStatus = SLEEP;
-                e.printStackTrace();
-            }
-
-            @Override
-            public void onResponse(String response, int id) {
-                version = ManagerFactory.getManagerService(ParseManager
-                        .class).parseObject(response, NativeVersionResBean.class);
-                if (version == null) {
-                    mCurrentStatus = SLEEP;
-                    Log.e(TAG, "version == null");
-                    return;
-                }
-                Log.e(TAG, "onResponse: " + JSON.toJSONString(version));
-                switch (version.getResCode()) {
-                    case "APP0003":
-                        //非强制更新
-                        if (!TextUtils.isEmpty(version.getData().getUrl())) {
-                            showConfirmDialog(false);
-                        }
-                        break;
-                    case "APP0002":
-                        //强制更新
-                        if (!TextUtils.isEmpty(version.getData().getUrl())) {
-                            showConfirmDialog(true);
-                        }
-                        break;
-                    case "APP0001":
-                        //版本最新
-                        mCurrentStatus = SLEEP;
-                        if (jvrb != null) {
-                            JsVersionChecker jsVersionChecker = new JsVersionChecker(context, jvrb);
-                            jsVersionChecker.checkJsUpdate();
-                        }
-                        break;
-                    default:
-                        break;
-
-                }
-            }
-        });
-    }
+    private String reqUrl;
 
     private DownloadService.DownloadBinder downloadBinder;
 
@@ -171,6 +79,68 @@ public class NativeVersionChecker {
 
         }
     };
+
+    public NativeVersionChecker(Activity context, String reqUrl , Map<String, String> params) {
+        this.reqUrl = reqUrl;
+        this.params = params;
+        this.context = context;
+    }
+
+    public void checkNativeUpdate() {
+        if (mCurrentStatus == UPDATING) return;
+        mCurrentStatus = UPDATING;
+
+        try {
+            Retrofit retrofit = new Retrofit.Builder()
+                    .baseUrl(reqUrl)
+                    .addConverterFactory(GsonConverterFactory.create())
+                    .build();
+
+            GetVersionInterface request = retrofit.create(GetVersionInterface.class);
+
+            Call<NativeVersionResBean> call = request.getVersionRes(reqUrl, params);
+
+
+            call.enqueue(new Callback<NativeVersionResBean>() {
+                @Override
+                public void onResponse(Call<NativeVersionResBean> call, Response<NativeVersionResBean> response) {
+                    version = response.body();
+                    if (version == null) {
+                        mCurrentStatus = SLEEP;
+                        return;
+                    }
+                    switch (version.getResCode()) {
+                        case "APP0003":
+                            //非强制更新
+                            if (!TextUtils.isEmpty(version.getData().getUrl())) {
+                                showConfirmDialog(false);
+                            }
+                            break;
+                        case "APP0002":
+                            //强制更新
+                            if (!TextUtils.isEmpty(version.getData().getUrl())) {
+                                showConfirmDialog(true);
+                            }
+                            break;
+                        case "APP0001":
+                            //版本最新
+                            mCurrentStatus = SLEEP;
+                            break;
+                        default:
+                            break;
+
+                    }
+                }
+
+                @Override
+                public void onFailure(Call<NativeVersionResBean> call, Throwable t) {
+                    mCurrentStatus = SLEEP;
+                }
+            });
+        } catch (Exception e) {
+
+        }
+    }
 
     private class DownloadListenerImpl implements DownloadListener {
 
@@ -215,6 +185,7 @@ public class NativeVersionChecker {
         Intent intent = new Intent(context, DownloadService.class);
         context.bindService(intent, connection, BIND_AUTO_CREATE);
         isConnectionBind = true;
+        mCurrentStatus = SLEEP;
 
         CommonUtils.CommonAlert.showAlert(context,
                 "提示",
@@ -222,9 +193,11 @@ public class NativeVersionChecker {
                 "立即更新", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        dialog.cancel();
-                        createProgressDialog();
-                        downloadBinder.startDownload(version.getData().getUrl());
+                        if (checkPermission()) {
+                            dialog.cancel();
+                            createProgressDialog();
+                            downloadBinder.startDownload(version.getData().getUrl());
+                        }
                     }
                 }, isForced ? "" : "暂不更新", isForced ? null : new DialogInterface.OnClickListener() {
                     @Override
@@ -232,11 +205,6 @@ public class NativeVersionChecker {
                         dialog.cancel();
                         context.unbindService(connection);
                         isConnectionBind = false;
-                        mCurrentStatus = SLEEP;
-                        if (jvrb != null) {
-                            JsVersionChecker jsVersionChecker = new JsVersionChecker(context, jvrb);
-                            jsVersionChecker.checkJsUpdate();
-                        }
                     }
                 }, false);
     }
@@ -256,5 +224,15 @@ public class NativeVersionChecker {
         if (isConnectionBind && connection != null) {
             context.unbindService(connection);
         }
+    }
+
+    private boolean checkPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(context, "需要允许读写存储卡权限", Toast.LENGTH_SHORT).show();
+                return false;
+            }
+        }
+        return true;
     }
 }

@@ -5,22 +5,11 @@ import android.app.ActivityManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
-import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
-import android.net.Uri;
 import android.support.v7.app.AlertDialog;
 import android.text.TextUtils;
-
-import com.benmu.framework.BMWXEnvironment;
-import com.benmu.framework.constant.Constant;
-import com.benmu.framework.constant.WXConstant;
-import com.benmu.framework.manager.ManagerFactory;
-import com.benmu.framework.manager.StorageManager;
-import com.benmu.framework.manager.impl.ParseManager;
-import com.benmu.framework.manager.impl.dispatcher.DispatchEventManager;
-import com.benmu.framework.model.RouterModel;
-import com.benmu.framework.model.WeexEventBean;
+import android.view.View;
 
 import java.io.File;
 import java.util.List;

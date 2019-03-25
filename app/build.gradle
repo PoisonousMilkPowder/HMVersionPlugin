@@ -3,6 +3,7 @@ apply plugin: 'com.android.application'
 android {
     compileSdkVersion 25
     defaultConfig {
+        flavorDimensions("default")
         applicationId "com.hm.wx"
         minSdkVersion 16
         targetSdkVersion 25
@@ -16,10 +17,21 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+    productFlavors {
+        develop {
+            dimension "default"
+        }
+        prod {
+            dimension "default"
+        }
+    }
 }
 
 dependencies {
-    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation "com.android.support:appcompat-v7:${PROJECT_SUPPORTLIBVERSION}"
     implementation 'com.android.support.constraint:constraint-layout:1.1.0'
+    implementation project(':version')
+    implementation 'com.squareup.retrofit2:retrofit:2.3.0'
+    implementation 'com.squareup.retrofit2:converter-gson:2.3.0'
 }

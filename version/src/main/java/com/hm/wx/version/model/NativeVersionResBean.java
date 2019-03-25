@@ -8,7 +8,7 @@ import java.io.Serializable;
  * com.hm.wx.version.modal
  */
 
-public class NativeVersionResBean implements Serializable {
+public class NativeVersionResBean {
 
     private String resCode;
     private String msg;
@@ -16,18 +16,6 @@ public class NativeVersionResBean implements Serializable {
 
     public String getResCode() {
         return resCode;
-    }
-
-    public void setResCode(String resCode) {
-        this.resCode = resCode;
-    }
-
-    public String getMsg() {
-        return msg;
-    }
-
-    public void setMsg(String msg) {
-        this.msg = msg;
     }
 
     public DataBean getData() {
@@ -47,16 +35,9 @@ public class NativeVersionResBean implements Serializable {
             return description;
         }
 
-        public void setDescription(String description) {
-            this.description = description;
-        }
-
         public String getUrl() {
             return url;
         }
 
-        public void setUrl(String url) {
-            this.url = url;
-        }
     }
 }

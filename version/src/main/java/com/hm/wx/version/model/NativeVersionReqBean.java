@@ -16,7 +16,7 @@ public class NativeVersionReqBean implements Serializable {
 
     private String appName;
 
-    private String baseUrl;
+    private String url;
 
     public void setClientVersion(String clientVersion) {
         this.clientVersion = clientVersion;
@@ -26,8 +26,8 @@ public class NativeVersionReqBean implements Serializable {
         this.appName = appName;
     }
 
-    public void setBaseUrl(String baseUrl) {
-        this.baseUrl = baseUrl;
+    public void setUrl(String url) {
+        this.url = url;
     }
 
     public String getClientVersion() throws Exception {
@@ -40,9 +40,9 @@ public class NativeVersionReqBean implements Serializable {
         return appName;
     }
 
-    public String getBaseUrl() throws Exception {
-        if (TextUtils.isEmpty(baseUrl)) throw new Exception("baseUrl empty");
-        return baseUrl;
+    public String getUrl() throws Exception {
+        if (TextUtils.isEmpty(url)) throw new Exception("baseUrl empty");
+        return url;
     }
 
 }
